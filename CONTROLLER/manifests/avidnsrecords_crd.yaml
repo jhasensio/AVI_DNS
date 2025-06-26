@@ -1,0 +1,45 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: avidnsrecords.akodns.vmware.com
+spec:
+  group: akodns.vmware.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                fqdn:
+                  type: string
+                type:
+                  type: string
+                  enum: ["A", "AAAA", "CNAME"]
+                ttl:
+                  type: integer
+                a_records:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ip:
+                        type: object
+                        properties:
+                          addr:
+                            type: string
+                          type:
+                            type: string
+                cname:
+                  type: string
+  scope: Namespaced
+  names:
+    plural: avidnsrecords
+    singular: avidnsrecord
+    kind: AVIDnsRecord
+    shortNames:
+      - adr

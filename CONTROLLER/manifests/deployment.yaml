@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: avi-dns-controller
+  labels:
+    app: avi-dns-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: avi-dns-controller
+  template:
+    metadata:
+      labels:
+        app: avi-dns-controller
+    spec:
+      containers:
+        - name: controller
+          image: tu-usuario/avi-dns-controller:latest
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config/controller_config.yaml
+              subPath: controller_config.yaml
+            - name: secret-volume
+              mountPath: /config/controller_secret.yaml
+              subPath: controller_secret.yaml
+      volumes:
+        - name: config-volume
+          configMap:
+            name: dns-controller-config
+        - name: secret-volume
+          secret:
+            secretName: dns-controller-secret

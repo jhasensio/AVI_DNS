@@ -1,0 +1,59 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: avi-dns-controller
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: avi-dns-controller-role
+  namespace: default
+rules:
+  - apiGroups: ["akodns.vmware.com"]
+    resources: ["avidnsrecords"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: avi-dns-controller-rolebinding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: avi-dns-controller
+    namespace: default
+roleRef:
+  kind: Role
+  name: avi-dns-controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: avi-dns-controller-clusterrole
+rules:
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["akodns.vmware.com"]
+    resources: ["avidnsrecords"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: avi-dns-controller-clusterbinding
+subjects:
+  - kind: ServiceAccount
+    name: avi-dns-controller
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: avi-dns-controller-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+

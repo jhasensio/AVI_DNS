@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-controller-config
+  namespace: default
+data:
+  controller_ip: "192.168.1.100"
+  tenant: "admin"
+  api_path: "/api/dnsrecord"
+  api_version: "22.1.2"

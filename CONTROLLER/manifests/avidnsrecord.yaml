@@ -1,0 +1,12 @@
+apiVersion: akodns.vmware.com/v1
+kind: AVIDnsRecord
+metadata:
+  name: dns-www
+spec:
+  fqdn: "www.ejemplo.local"
+  type: "A"
+  ttl: 300
+  a_records:
+    - ip:
+        addr: "10.10.10.10"
+        type: "V4"
