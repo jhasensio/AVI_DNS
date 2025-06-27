@@ -4,7 +4,7 @@ metadata:
   name: dns-controller-config
   namespace: default
 data:
-  controller_ip: "192.168.1.100"
+  controller_ip: "192.168.1.15"
   tenant: "admin"
-  api_path: "/api/dnsrecord"
-  api_version: "22.1.2"
+  dns_vs_name: "dns"
+  api_version: "22.1.6"

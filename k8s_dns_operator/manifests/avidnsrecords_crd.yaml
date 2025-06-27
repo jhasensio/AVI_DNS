@@ -14,28 +14,31 @@ spec:
           properties:
             spec:
               type: object
+              required:
+                - fqdn
+                - rtype
               properties:
                 fqdn:
                   type: string
-                type:
-                  type: string
-                  enum: ["A", "AAAA", "CNAME"]
                 ttl:
                   type: integer
-                a_records:
+                rtype:
+                  type: string
+                  enum:
+                    - DNS_RECORD_A
+                    - DNS_RECORD_AAA
+                ip_address:
                   type: array
                   items:
                     type: object
                     properties:
-                      ip:
+                      ip_address:
                         type: object
                         properties:
                           addr:
                             type: string
                           type:
                             type: string
-                cname:
-                  type: string
   scope: Namespaced
   names:
     plural: avidnsrecords

@@ -1,29 +1,39 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: avi-dns-controller
-  labels:
-    app: avi-dns-controller
+  name: ubuntu-tools
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: avi-dns-controller
+      app: ubuntu-tools
   template:
     metadata:
       labels:
-        app: avi-dns-controller
+        app: ubuntu-tools
     spec:
+      serviceAccountName: avi-dns-controller
       containers:
-        - name: controller
-          image: tu-usuario/avi-dns-controller:latest
-          volumeMounts:
-            - name: config-volume
-              mountPath: /config/controller_config.yaml
-              subPath: controller_config.yaml
-            - name: secret-volume
-              mountPath: /config/controller_secret.yaml
-              subPath: controller_secret.yaml
+      - name: ubuntu-tools
+        image: python:3.11-slim
+        ports:
+        - containerPort: 5000
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            apt update && \
+            apt install -y vim nano curl git procps netcat-openbsd iputils-ping && \
+            pip install kopf avisdk pyyaml && \
+            tail -f /dev/null
+        stdin: true
+        tty: true
+        volumeMounts:
+          - name: config-volume
+            mountPath: /config/controller_config.yaml
+            subPath: controller_config.yaml
+          - name: secret-volume
+            mountPath: /config/controller_secret.yaml
+            subPath: controller_secret.yaml
       volumes:
         - name: config-volume
           configMap:
