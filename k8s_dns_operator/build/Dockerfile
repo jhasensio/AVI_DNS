@@ -1,12 +1,12 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Instalar dependencias necesarias
+# Install dependencies
 RUN pip install --no-cache-dir kopf avisdk pyyaml
 
-# Crear carpeta y copiar código
+# Create folder and add files
 WORKDIR /app
-COPY handler.py .
+COPY avidnsoperator.py .
 COPY requirements.txt .
 
-# Ejecutar el controlador
-ENTRYPOINT ["kopf", "run", "--standalone", "handler.py"]
+# Command to launch operator
+ENTRYPOINT ["kopf", "run", "--standalone", "avidnsoperator.py"]

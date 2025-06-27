@@ -1,30 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ubuntu-tools
+  name: avidnsoperator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ubuntu-tools
+      app: avidnsoperator
   template:
     metadata:
       labels:
-        app: ubuntu-tools
+        app: avidnsoperator
     spec:
       serviceAccountName: avi-dns-controller
       containers:
-      - name: ubuntu-tools
-        image: python:3.11-slim
+      - name: avidnsoperator
+        image: jhasensio/avidnsoperator:1.0
         ports:
-        - containerPort: 5000
-        command: ["/bin/sh", "-c"]
-        args:
-          - |
-            apt update && \
-            apt install -y vim nano curl git procps netcat-openbsd iputils-ping && \
-            pip install kopf avisdk pyyaml && \
-            tail -f /dev/null
         stdin: true
         tty: true
         volumeMounts:

@@ -99,9 +99,6 @@ def delete_dns_record(api, config, fqdn):
     else:
         print('Error in modifying '+url_path+' :%s' % resp.text)
 
-
-
-
 def update_dns_record(api, config, fqdn, ip_address, ttl, rtype):
 
     vs_data = get_vs_config(api, config)
