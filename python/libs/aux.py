@@ -53,13 +53,14 @@ def print_dns_records (vs_data: dict):
 
     # Print rows
     id=0
-    for record in vs_data['static_dns_records']:
-        fqdn = record.get('fqdn', [''])[0]
-        ip = record.get('ip_address', [{}])[0].get('ip_address', {}).get('addr', '')
-        ttl = record.get('ttl', '-')
-        rec_type = record.get('type', '-')
-        print(f"{id:<2} {fqdn:<25} {ip:<15} {ttl:<5} {rec_type}")
-        id=id+1
+    if 'static_dns_records' in vs_data:
+      for record in vs_data['static_dns_records']:
+          fqdn = record.get('fqdn', [''])[0]
+          ip = record.get('ip_address', [{}])[0].get('ip_address', {}).get('addr', '')
+          ttl = record.get('ttl', '-')
+          rec_type = record.get('type', '-')
+          print(f"{id:<2} {fqdn:<25} {ip:<15} {ttl:<5} {rec_type}")
+          id=id+1
 
 
 # Extract DNS records from a given VS name

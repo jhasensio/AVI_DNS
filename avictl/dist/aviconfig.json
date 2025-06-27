@@ -1,0 +1,8 @@
+{
+  "controller_ip": "192.168.1.15",
+  "api_version": "22.1.6",
+  "controller_username": "admin",
+  "controller_password": "VMware1!",
+  "tenant": "admin",
+  "dns_vs_name": "dns"
+}
