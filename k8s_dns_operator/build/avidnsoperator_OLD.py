@@ -5,7 +5,6 @@ import yaml
 import re
 import json
 import datetime
-import time
 
 urllib3.disable_warnings()
 
@@ -67,90 +66,104 @@ def get_vs_config (api: object, config: dict):
     # Save Result
     return(resp_data[0])
 
+def delete_dns_record(api, config, fqdn):
+    if not fqdn:
+        print("Parameter --fqdn is required.")
 
-def patch_vs_with_retries(api, config, mutate_fn, max_retries=3, backoff=1):
-    """
-    Repeatedly:
-      1) GET the latest VS
-      2) Call mutate_fn(vs) → new_vs_body
-      3) PUT the new body
-    until success or max_retries.
-    If still failing, raises TemporaryError for Kopf to retry later.
-    """
-    for attempt in range(1, max_retries + 1):
-        vs = get_vs_config(api, config)              # freshest copy
-        body = mutate_fn(vs.copy())                  # let caller apply their patch
-        resp = api.put(f"virtualservice/{vs['uuid']}",
-                       data=json.dumps(body))
-        text = (resp.text or "")
-        if 200 <= resp.status_code < 300:
-            return resp
-        if "Concurrent Update Error" in text and attempt < max_retries:
-            time.sleep(backoff)
-            continue
-        # non-retryable or out of attempts → hand off to Kopf
-        raise kopf.TemporaryError(f"VS update failed: {text}", delay=backoff)
+    # Retrieve current vs information
+    vs_data=get_vs_config(api, config)
 
-    # unreachable
-    raise kopf.TemporaryError("VS retry loop failed unexpectedly", delay=backoff)
+    # Remove entry with particular FQDN
+    if 'static_dns_records' in vs_data:
+        original_count = len(vs_data["static_dns_records"])
 
-def create_dns_record(api, config, fqdn, ip_address, ttl, rtype, delegated, algorithm, wildcard_match):
-    def patch_fn(vs):
-        existing = { r['fqdn'][0] for r in vs.get('static_dns_records', []) }
-        if fqdn not in existing:
-            vs.setdefault('static_dns_records', []).append({
-                'fqdn':      [fqdn],
-                'ip_address': ip_address,
-                'ttl':        ttl,
-                'type':       rtype,
-                'delegated':  delegated,
-                'algorithm':  algorithm,
-                'wildcard_match': wildcard_match
-            })
-        return vs
+        vs_data["static_dns_records"] = [
+            record for record in vs_data["static_dns_records"]
+            if record.get("fqdn", [None])[0] != fqdn
+        ]
+
+        new_count = len(vs_data["static_dns_records"])
+        if original_count == new_count:
+            log(f"- No DNS record found with FQDN: {fqdn}")
+    else:
+        log('-DNS virtualservice does not have any DNS Records. Nothing to do')
+
+    # Define PUT parameters
+    url_path="virtualservice/"+vs_data["uuid"]
+
+    #Send BODY information via PUT
+    resp = api.put (url_path, data=json.dumps(vs_data))
+
+    if resp.status_code in range(200, 299):
+        log('- Record '+fqdn+" deleted ", resp.reason)#, resp.text)
+    else:
+        log('Error in modifying '+url_path+' :%s' % resp.text)
+
+def update_dns_record(api, config, fqdn, ip_address, ttl, rtype):
+    vs_data = get_vs_config(api, config)
+    existing_records = vs_data.get("static_dns_records", [])
+
+    # Verify if fqdn exists
+    vs_data["static_dns_records"] = [
+        rec for rec in existing_records
+        if fqdn not in rec.get("fqdn", [])
+    ]
+
+    # Craft new object
+    new_dns_record= {
+    'fqdn': [fqdn],
+    'ip_address': ip_address,
+    'ttl': ttl,
+    'type': rtype}
+
+    # Ahora puedes añadir el nuevo sin riesgo de duplicados
+    vs_data["static_dns_records"].append(new_dns_record)
+
+    # Define PUT parameters
+    url_path="virtualservice/"+vs_data["uuid"]
+    body =  vs_data
+
+    #Send BODY information via PUT
+    resp = api.put (url_path, data=json.dumps(body))
+
+    if resp.status_code in range(200, 299):
+        log(resp)
+        log('- Object '+url_path+' named '+body['name']+ " modified", resp.reason)#, resp.text)
+    else:
+        log('Error in modifying '+url_path+' :%s' % resp.text)
+
+def create_dns_record(api, config, fqdn, ip_address, ttl, rtype):
+    if not is_valid_fqdn(fqdn):
+        log(f"Invalid FQDN: '{fqdn}'. It must contain a domain like 'example.com'.")
+        sys.exit(1)
+
+    # Craft new object
+    new_dns_record= {
+    'fqdn': [fqdn],
+    'ip_address': ip_address,
+    'ttl': ttl,
+    'type': rtype}
+
+    # Get current VS configuration
+    vs_data=get_vs_config(api, config)
+
+    # Insert new entry into vs_data body
+    if 'static_dns_records' in vs_data:
+       vs_data['static_dns_records'].append(new_dns_record)
+    else:
+        vs_data['static_dns_records']=[new_dns_record]
+
+    # Define PUT parameters
+    url_path="virtualservice/"+vs_data["uuid"]
 
     log(f"Creating DNS record: {fqdn} -> {ip_address} {ttl} [{rtype}]")
-    try:
-        patch_vs_with_retries(api, config, patch_fn)
-        log("Record created successfully.")
-    except kopf.TemporaryError as e:
-        # Kopf will automatically retry the handler after e.delay
-        raise
+    #Send BODY information via PUT
+    resp = api.put (url_path, data=json.dumps(vs_data))
 
-def update_dns_record(api, config, fqdn, ip_address, ttl, rtype, delegated, algorithm, wildcard_match):
-    def patch_fn(vs):
-        # remove any existing for this fqdn
-        vs['static_dns_records'] = [
-            rec for rec in vs.get('static_dns_records', [])
-            if fqdn not in rec.get('fqdn', [])
-        ]
-        # add the new one
-        vs['static_dns_records'].append({
-            'fqdn':      [fqdn],
-            'ip_address': ip_address,
-            'ttl':       ttl,
-            'type':      rtype,
-            'delegated':  delegated,
-            'algorithm':  algorithm,
-            'wildcard_match': wildcard_match
-        })
-        return vs
-
-    log(f"Updating DNS record: {fqdn}")
-    patch_vs_with_retries(api, config, patch_fn)
-    log("Record updated successfully.")
-
-def delete_dns_record(api, config, fqdn):
-    def patch_fn(vs):
-        vs['static_dns_records'] = [
-            rec for rec in vs.get('static_dns_records', [])
-            if rec.get('fqdn', [None])[0] != fqdn
-        ]
-        return vs
-
-    log(f"Deleting DNS record: {fqdn}")
-    patch_vs_with_retries(api, config, patch_fn)
-    log("Record deleted successfully.")
+    if resp.status_code in range(200, 299):
+        log('Record '+fqdn+" created ", resp.reason)#, resp.text)
+    else:
+        log('Error in modifying '+url_path+' :%s' % resp.text)
 
 
 def record_exists_in_vs(spec, vs_data):
@@ -158,25 +171,19 @@ def record_exists_in_vs(spec, vs_data):
     ip = spec.get("ip_address", [{}])[0]
     ttl = spec.get("ttl", 300)
     rtype = spec.get("rtype")
-    delegated = spec.get("delegated", False)
-    algorithm = spec.get("algorithm", "DNS_RECORD_RESPONSE_ROUND_ROBIN")
-    wildcard_match = spec.get("wildcard_match", False)
 
     for record in vs_data.get("static_dns_records", []):
         if fqdn in record.get("fqdn", []):
-            if record.get("type") == rtype and record.get("ttl") == ttl and record.get("delegated")==delegated and record.get("algorithm")==algorithm and record.get("wildcard_match")==wildcard_match:
+            if record.get("type") == rtype and record.get("ttl") == ttl:
                 ip_list = record.get("ip_address", [])
                 if any(entry.get("ip_address", {}).get("addr") == ip.get("addr") for entry in ip_list):
                     return True
     return False
 
-def log(*parts):
-    """
-    Accepts any number of arguments, converts each to str, and joins them with spaces.
-    """
+def log(msg):
     timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S,%f]")[:-3]
-    message = " ".join(str(p) for p in parts)
-    print(f"{timestamp} {message}")
+    print(f"{timestamp} {msg}")
+
 
 ################################################################################
 #
@@ -197,11 +204,7 @@ def create_dnsrecord(spec, status, patch, **kwargs):
         api_version=config.get('api_version')
     )
 
-    create_dns_record(api, config, spec["fqdn"], spec.get("ip_address"), spec.get("ttl", 300), spec["rtype"], spec.get("delegated", False), spec.get("algorithm", "DNS_RECORD_RESPONSE_ROUND_ROBIN"), spec.get("wildcard_match", False))
-    patch.status['reconciled']  = True
-    patch.status['sync_state']  = 'synced'
-    patch.status['last_synced'] = datetime.datetime.utcnow().isoformat() + "Z"
-
+    create_dns_record(api, config, spec["fqdn"], spec.get("ip_address"), spec.get("ttl", 300), spec["rtype"])
 
 ################################################################################
 #
@@ -233,12 +236,16 @@ def delete_dnsrecord(spec, **kwargs):
 #
 # ################################################################################
 @kopf.on.update('akodns.vmware.com', 'v1', 'avidnsrecords')
-def update_dnsrecord(spec, old, new, diff, status, patch, **kwargs):
+def update_dnsrecord(spec, old, new, diff, **kwargs):
     config = load_config()
     patch.status['reconciled'] = False
     patch.status['sync_state'] = 'updating'
 
-    fqdn = spec["fqdn"]
+    fqdn = spec.get("fqdn")
+    ip_address= spec.get("ip_address")
+    ttl = spec.get("ttl", 300)
+    rtype = spec.get("rtype")
+
 
     if not fqdn:
         raise kopf.PermanentError("Missing 'fqdn' in update.")
@@ -251,24 +258,19 @@ def update_dnsrecord(spec, old, new, diff, status, patch, **kwargs):
         api_version=config.get('api_version')
     )
 
-    update_dns_record(api, config, spec["fqdn"], spec.get("ip_address"), spec.get("ttl", 300), spec["rtype"], spec.get("delegated", False), spec.get("algorithm", "DNS_RECORD_RESPONSE_ROUND_ROBIN"), spec.get("wildcard_match", False))
-
-    patch.status['reconciled']  = True
-    patch.status['sync_state']  = 'synced'
-    patch.status['last_synced'] = datetime.datetime.utcnow().isoformat() + "Z"
-
+    update_dns_record(api, config, fqdn, ip_address, ttl, rtype)
 
 ################################################################################
 #
-# Reconcile
+# Reconcile 
 #
 # ################################################################################
-@kopf.timer('akodns.vmware.com', 'v1', 'avidnsrecords', interval=120, sharp=False, initial_delay=30)
+@kopf.timer('akodns.vmware.com', 'v1', 'avidnsrecords', interval=300, sharp=True)
 def reconcile_periodically(spec, status, patch, meta, **kwargs):
     if status.get("reconciled") is False or status.get("sync_state") in ["creating", "updating"]:
         print(f"⏱️ [{meta['name']}] Skipping reconciliation (still in transition).")
         return
-
+    
     config = load_config()
     api = ApiSession.get_session(
         controller_ip=config['controller_ip'],
@@ -281,11 +283,11 @@ def reconcile_periodically(spec, status, patch, meta, **kwargs):
     vs_data = get_vs_config(api, config)
 
     if not record_exists_in_vs(spec, vs_data):
-        log(f"[RECONCILE] Record {spec['fqdn']} not present or outdated. Re-applying...")
-        update_dns_record(api, config, spec["fqdn"], spec.get("ip_address"), spec.get("ttl", 300), spec["rtype"], spec.get("delegated", False), spec.get("algorithm", "DNS_RECORD_RESPONSE_ROUND_ROBIN"), spec.get("wildcard_match", False))
+        print(f"[RECONCILE] Record {spec['fqdn']} not present or outdated. Re-applying...")
+        update_dns_record(api, config, spec["fqdn"], spec["ip_address"], spec.get("ttl", 300), spec["rtype"])
     else:
-        log(f"[RECONCILE] Record {spec['fqdn']} is in sync.")
-
+        print(f"[RECONCILE] Record {spec['fqdn']} is in sync.")
+    
     patch.status['last_synced'] = datetime.datetime.utcnow().isoformat() + "Z"
     patch.status['reconciled'] = True
     patch.status['sync_state'] = 'synced'

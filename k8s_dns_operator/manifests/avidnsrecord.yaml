@@ -6,6 +6,9 @@ spec:
   fqdn: "test.example.local"
   ttl: 300
   rtype: DNS_RECORD_A
+  algorithm: DNS_RECORD_RESPONSE_ROUND_ROBIN
+  delegated: False
+  wildcard_match: False
   ip_address:
     - ip_address:
         addr: 192.168.1.112

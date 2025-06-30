@@ -4,6 +4,11 @@ metadata:
   name: avidnsrecords.akodns.vmware.com
 spec:
   group: akodns.vmware.com
+  names:
+    kind: AVIDnsRecord
+    plural: avidnsrecords
+    singular: avidnsrecord
+  scope: Namespaced
   versions:
     - name: v1
       served: true
@@ -20,13 +25,27 @@ spec:
               properties:
                 fqdn:
                   type: string
-                ttl:
-                  type: integer
+                  pattern: "^([A-Za-z0-9-]{1,63}\\.)+[A-Za-z]{2,}$"
                 rtype:
                   type: string
                   enum:
                     - DNS_RECORD_A
                     - DNS_RECORD_AAA
+                ttl:
+                  type: integer
+                  minimum: 1
+                  default: 300
+                num_records_in_response:
+                  type: integer
+                wildcard_match:
+                  type: boolean
+                delegated:
+                  type: boolean
+                algorithm:
+                  type: string
+                  enum:
+                    - DNS_RECORD_RESPONSE_ROUND_ROBIN
+                    - DNS_RECORD_RESPONSE_CONSISTENT_HASH
                 ip_address:
                   type: array
                   items:
@@ -37,12 +56,21 @@ spec:
                         properties:
                           addr:
                             type: string
+                            format: ipv4
                           type:
                             type: string
-  scope: Namespaced
-  names:
-    plural: avidnsrecords
-    singular: avidnsrecord
-    kind: AVIDnsRecord
-    shortNames:
-      - adr
+                            enum:
+                            - V4
+                            - V6
+            status:
+              type: object
+              properties:
+                reconciled:
+                  type: boolean
+                sync_state:
+                  type: string
+                  enum: [creating, updating, synced]
+                last_synced:
+                  type: string
+                  format: date-time
+  
